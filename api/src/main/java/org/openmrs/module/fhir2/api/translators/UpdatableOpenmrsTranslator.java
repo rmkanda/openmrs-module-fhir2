@@ -15,7 +15,7 @@ package org.openmrs.module.fhir2.api.translators;
  * @param <T> OpenMRS data type
  * @param <U> FHIR resource type
  */
-public interface UpdatableOpenmrsTranslator<T, U> {
+public interface UpdatableOpenmrsTranslator<T, U> extends FhirTranslator {
 	
 	/**
 	 * Maps a FHIR resource to an existing OpenMRS data element

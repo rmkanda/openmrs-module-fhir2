@@ -21,12 +21,15 @@ import ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.openmrs.module.ModuleFactory;
+import org.openmrs.module.fhir2.FhirActivator;
 import org.openmrs.module.fhir2.FhirConstants;
 import org.openmrs.module.fhir2.api.FhirGlobalPropertyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.support.SpringBeanAutowiringSupport;
 
 @Component
 @Setter(AccessLevel.PACKAGE)
@@ -45,7 +48,7 @@ public class FhirRestServlet extends RestfulServer {
 	protected void initialize() {
 		// ensure properties for this class are properly injected
 		if (globalPropertyService == null) {
-			SpringBeanAutowiringSupport.processInjectionBasedOnServletContext(this, getServletContext());
+			autoInject();
 		}
 		
 		int defaultPageSize = NumberUtils
@@ -60,6 +63,17 @@ public class FhirRestServlet extends RestfulServer {
 		setPagingProvider(pp);
 		setDefaultResponseEncoding(EncodingEnum.JSON);
 		registerInterceptor(loggingInterceptor);
+	}
+	
+	protected void autoInject() {
+		// get the activator which contains our ApplicationContext
+		FhirActivator activator = (FhirActivator) ModuleFactory.getModuleById("fhir2").getModuleActivator();
+		
+		// Auto-wire this class
+		ApplicationContext ctx = activator.getApplicationContext();
+		AutowiredAnnotationBeanPostProcessor bpp = new AutowiredAnnotationBeanPostProcessor();
+		bpp.setBeanFactory(ctx.getAutowireCapableBeanFactory());
+		bpp.processInjection(this);
 	}
 	
 	@Override
