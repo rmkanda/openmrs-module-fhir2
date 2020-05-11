@@ -495,7 +495,7 @@ public class PatientFhirResourceProviderWebTest extends BaseFhirResourceProvider
 		Patient patient = new Patient();
 		patient.setId(PATIENT_UUID);
 		when(patientService.searchForPatients(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-		    any(), any())).thenReturn(Collections.singletonList(patient));
+		    any(), any())).thenReturn(new BaseFhirIBundleResourceProviderTest<>(Collections.singletonList(patient), 10, 1));
 		
 		MockHttpServletResponse response = get(uri).accept(FhirMediaTypes.JSON).go();
 		

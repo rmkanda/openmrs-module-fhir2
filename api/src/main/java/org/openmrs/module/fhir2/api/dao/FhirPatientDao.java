@@ -11,16 +11,10 @@ package org.openmrs.module.fhir2.api.dao;
 
 import javax.validation.constraints.NotNull;
 
-import java.util.Collection;
-
-import ca.uhn.fhir.rest.api.SortSpec;
-import ca.uhn.fhir.rest.param.DateRangeParam;
-import ca.uhn.fhir.rest.param.StringOrListParam;
-import ca.uhn.fhir.rest.param.TokenOrListParam;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifierType;
 
-public interface FhirPatientDao {
+public interface FhirPatientDao extends FhirDao<Patient> {
 	
 	Patient getPatientById(@NotNull Integer id);
 	
@@ -28,8 +22,4 @@ public interface FhirPatientDao {
 	
 	PatientIdentifierType getPatientIdentifierTypeByNameOrUuid(String name, String uuid);
 	
-	Collection<Patient> searchForPatients(StringOrListParam name, StringOrListParam given, StringOrListParam family,
-	        TokenOrListParam identifier, TokenOrListParam gender, DateRangeParam birthDate, DateRangeParam deathDate,
-	        TokenOrListParam deceased, StringOrListParam city, StringOrListParam state, StringOrListParam postalCode,
-	        StringOrListParam country, SortSpec sort);
 }

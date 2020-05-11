@@ -14,11 +14,11 @@ import static org.hibernate.criterion.Restrictions.eq;
 import static org.hibernate.criterion.Restrictions.or;
 import static org.hl7.fhir.r4.model.Patient.SP_DEATH_DATE;
 
-import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicReference;
 
-import ca.uhn.fhir.rest.api.SortSpec;
 import ca.uhn.fhir.rest.param.DateRangeParam;
 import ca.uhn.fhir.rest.param.StringOrListParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
@@ -27,7 +27,10 @@ import lombok.Setter;
 import org.hibernate.Criteria;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifierType;
+import org.openmrs.module.fhir2.FhirConstants;
 import org.openmrs.module.fhir2.api.dao.FhirPatientDao;
+import org.openmrs.module.fhir2.api.search.param.PropParam;
+import org.openmrs.module.fhir2.api.search.param.SearchParameterMap;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -70,25 +73,61 @@ public class FhirPatientDaoImpl extends BasePersonDao<Patient> implements FhirPa
 	}
 	
 	@Override
-	public Collection<Patient> searchForPatients(StringOrListParam name, StringOrListParam given, StringOrListParam family,
-	        TokenOrListParam identifier, TokenOrListParam gender, DateRangeParam birthDate, DateRangeParam deathDate,
-	        TokenOrListParam deceased, StringOrListParam city, StringOrListParam state, StringOrListParam postalCode,
-	        StringOrListParam country, SortSpec sort) {
-		Criteria criteria = getSessionFactory().getCurrentSession().createCriteria(Patient.class);
+	protected void setupSearchParams(Criteria criteria, SearchParameterMap theParams) {
+		theParams.getParameters().forEach(entry -> {
+			switch (entry.getKey()) {
+				case FhirConstants.NAME_SEARCH_HANDLER:
+					handleNames(entry.getValue(), criteria);
+					break;
+				case FhirConstants.GENDER_SEARCH_HANDLER:
+					entry.getValue().forEach(
+					    p -> handleGender(p.getPropertyName(), (TokenOrListParam) p.getParam()).ifPresent(criteria::add));
+					break;
+				case FhirConstants.IDENTIFIER_SEARCH_HANDLER:
+					entry.getValue()
+					        .forEach(identifier -> handleIdentifier(criteria, (TokenOrListParam) identifier.getParam()));
+					break;
+				case FhirConstants.DATE_RANGE_SEARCH_HANDLER:
+					entry.getValue().forEach(dateRangeParam -> handleDateRange(dateRangeParam.getPropertyName(),
+					    (DateRangeParam) dateRangeParam.getParam()).ifPresent(criteria::add));
+					break;
+				case FhirConstants.BOOLEAN_SEARCH_HANDLER:
+					entry.getValue().forEach(
+					    b -> handleBoolean(b.getPropertyName(), (TokenOrListParam) b.getParam()).ifPresent(criteria::add));
+					break;
+				case FhirConstants.ADDRESS_SEARCH_HANDLER:
+					handleAddresses(criteria, entry);
+					break;
+			}
+		});
+	}
+	
+	private void handleAddresses(Criteria criteria, Map.Entry<String, List<PropParam<?>>> entry) {
+		AtomicReference<StringOrListParam> city = new AtomicReference<>();
+		AtomicReference<StringOrListParam> country = new AtomicReference<>();
+		AtomicReference<StringOrListParam> postalCode = new AtomicReference<>();
+		AtomicReference<StringOrListParam> state = new AtomicReference<>();
+		entry.getValue().forEach(d -> {
+			switch (d.getPropertyName()) {
+				case FhirConstants.CITY_PROPERTY:
+					city.set((StringOrListParam) d.getParam());
+					break;
+				case FhirConstants.COUNTRY_PROPERTY:
+					country.set((StringOrListParam) d.getParam());
+					break;
+				case FhirConstants.POSTAL_CODE_PROPERTY:
+					postalCode.set((StringOrListParam) d.getParam());
+					break;
+				case FhirConstants.STATE_PROPERTY:
+					state.set((StringOrListParam) d.getParam());
+					break;
+			}
+		});
 		
-		handleNames(criteria, name, given, family);
-		handleIdentifier(criteria, identifier);
-		handleGender("gender", gender).ifPresent(criteria::add);
-		handleDateRange("birthdate", birthDate).ifPresent(criteria::add);
-		handleDateRange("deathDate", deathDate).ifPresent(criteria::add);
-		handleBoolean("dead", deceased).ifPresent(criteria::add);
-		handlePersonAddress("pad", city, state, postalCode, country).ifPresent(c -> {
+		handlePersonAddress("pad", city.get(), state.get(), postalCode.get(), country.get()).ifPresent(c -> {
 			criteria.createAlias("addresses", "pad");
 			criteria.add(c);
 		});
-		handleSort(criteria, sort);
-		
-		return criteria.list();
 	}
 	
 	@Override
@@ -103,5 +142,21 @@ public class FhirPatientDaoImpl extends BasePersonDao<Patient> implements FhirPa
 		}
 		
 		return super.paramToProp(param);
+	}
+	
+	private void handleNames(List<PropParam<?>> params, Criteria criteria) {
+		params.forEach(param -> {
+			switch (param.getPropertyName()) {
+				case FhirConstants.NAME_PROPERTY:
+					handleNames(criteria, (StringOrListParam) param.getParam(), null, null);
+					break;
+				case FhirConstants.GIVEN_PROPERTY:
+					handleNames(criteria, null, (StringOrListParam) param.getParam(), null);
+					break;
+				case FhirConstants.FAMILY_PROPERTY:
+					handleNames(criteria, null, null, (StringOrListParam) param.getParam());
+					break;
+			}
+		});
 	}
 }
